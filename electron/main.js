@@ -558,7 +558,9 @@ function startNextServer() {
       
       setupServerListeners(serverProcess, resolve, reject);
     } else {
-      // Production mode: spawn the standalone server as a process
+      // Production mode: spawn the standalone server as a SEPARATE PROCESS
+      // This is critical - the standalone server must run in its own process
+      // for API routes to work correctly
       const appPath = app.getAppPath();
       const resourcesPath = process.resourcesPath || path.dirname(appPath);
       
@@ -589,27 +591,13 @@ function startNextServer() {
         }
       }
       
-      // Look for production wrapper, or use standalone server directly
-      const prodWrapperPath = path.join(resourcesPath, 'server.prod.js');
-      const prodWrapperPath2 = path.join(appPath, 'server.prod.js');
-      const prodWrapperPath3 = path.join(__dirname, '..', 'server.prod.js');
-      
-      let wrapperPath = null;
-      if (fs.existsSync(prodWrapperPath)) {
-        wrapperPath = prodWrapperPath;
-      } else if (fs.existsSync(prodWrapperPath2)) {
-        wrapperPath = prodWrapperPath2;
-      } else if (fs.existsSync(prodWrapperPath3)) {
-        wrapperPath = prodWrapperPath3;
-      }
-      
       if (!serverPath || !serverDir) {
         console.error('Server not found. Tried:', possiblePaths);
         reject(new Error('Server file not found. Make sure you ran "npm run build" first.'));
         return;
       }
       
-      console.log('Starting Next.js production server...');
+      console.log('Starting Next.js production server as child process...');
       console.log('Port:', actualPort);
       console.log('Hostname: 127.0.0.1');
       
@@ -620,140 +608,53 @@ function startNextServer() {
         return;
       }
       
-      // Check if file is readable
-      try {
-        fs.accessSync(serverPath, fs.constants.R_OK);
-      } catch (err) {
-        console.error('Server file is not readable:', err);
-        reject(new Error(`Server file is not accessible: ${serverPath}`));
-        return;
-      }
-      
-      // Verify serverDir is actually a directory
-      try {
-        const serverDirStat = fs.statSync(serverDir);
-        if (!serverDirStat.isDirectory()) {
-          reject(new Error(`Server directory is not a directory: ${serverDir}`));
-          return;
-        }
-        console.log('Server directory verified:', serverDir);
-      } catch (err) {
-        console.error('Error accessing server directory:', err);
-        reject(new Error(`Cannot access server directory: ${serverDir} - ${err.message}`));
-        return;
-      }
-      
-      console.log('Server file verified, spawning process...');
-      
       // Use a temp file to communicate the actual port back
       const portFile = path.join(serverDir, '.electron-port');
       
-      // Verify the server file is actually a file
-      const serverFileStat = fs.statSync(serverPath);
-      if (!serverFileStat.isFile()) {
-        reject(new Error(`Server path is not a file: ${serverPath}`));
-        return;
-      }
+      // Ensure Next.js can find static files
+      const staticPath = path.join(serverDir, '.next', 'static');
+      const staticPathAlt = path.join(serverDir, '..', 'static');
+      const staticPathAlt2 = path.join(resourcesPath, '.next', 'static');
       
-      console.log('Starting server in Electron process...');
-      console.log('Server script:', serverPath);
-      console.log('Working directory:', serverDir);
-      console.log('Port:', actualPort);
-      
-      // Ensure serverPath is an absolute path
-      const absoluteServerPath = path.isAbsolute(serverPath) ? serverPath : path.resolve(serverDir, serverPath);
-      console.log('Absolute server path:', absoluteServerPath);
-      
-      // Verify absolute path exists
-      if (!fs.existsSync(absoluteServerPath)) {
-        reject(new Error(`Absolute server path does not exist: ${absoluteServerPath}`));
-        return;
-      }
-      
-      // Change to server directory and set environment
-      const originalCwd = process.cwd();
-      const originalEnv = { ...process.env };
-      
-      try {
-        process.chdir(serverDir);
-        process.env.NODE_ENV = 'production';
-        process.env.PORT = String(actualPort);
-        process.env.HOSTNAME = '127.0.0.1';
-        process.env.ELECTRON_APP_PATH = serverDir;
-        process.env.PORT_FILE = portFile;
-        process.env.NEXT_RUNTIME = 'nodejs';
-        
-        // Ensure Next.js can find static files
-        // The standalone server looks for .next/static relative to where it runs
-        // Since we're running from .next/standalone, it should find .next/standalone/.next/static
-        const staticPath = path.join(serverDir, '.next', 'static');
-        const staticPathAlt = path.join(serverDir, '..', 'static');
-        const staticPathAlt2 = path.join(resourcesPath, '.next', 'static');
-        
-        console.log('Checking for static files...');
-        console.log('  Expected location:', staticPath);
-        console.log('  Alternative 1:', staticPathAlt);
-        console.log('  Alternative 2:', staticPathAlt2);
-        
-        if (fs.existsSync(staticPath)) {
-          console.log('✓ Static files found at:', staticPath);
-        } else if (fs.existsSync(staticPathAlt)) {
-          console.log('✓ Static files found at alternative location:', staticPathAlt);
-          // Create symlink or copy
-          try {
-            if (!fs.existsSync(path.dirname(staticPath))) {
-              fs.mkdirSync(path.dirname(staticPath), { recursive: true });
-            }
-            fs.symlinkSync(path.relative(path.dirname(staticPath), staticPathAlt), staticPath, 'dir');
-            console.log('✓ Created symlink to static files');
-          } catch (err) {
-            console.error('Failed to create symlink:', err);
+      console.log('Checking for static files...');
+      if (fs.existsSync(staticPath)) {
+        console.log('✓ Static files found at:', staticPath);
+      } else if (fs.existsSync(staticPathAlt)) {
+        console.log('✓ Static files found at alternative location:', staticPathAlt);
+        try {
+          if (!fs.existsSync(path.dirname(staticPath))) {
+            fs.mkdirSync(path.dirname(staticPath), { recursive: true });
           }
-        } else if (fs.existsSync(staticPathAlt2)) {
-          console.log('✓ Static files found at resources location:', staticPathAlt2);
-        } else {
-          console.error('✗ ERROR: Static files not found in any location!');
-          console.error('  This will cause 404 errors for client-side JavaScript.');
+          fs.symlinkSync(path.relative(path.dirname(staticPath), staticPathAlt), staticPath, 'dir');
+          console.log('✓ Created symlink to static files');
+        } catch (err) {
+          console.error('Failed to create symlink:', err);
         }
-        
-        // NextAuth requires these environment variables
-        process.env.NEXTAUTH_URL = `http://127.0.0.1:${actualPort}`;
-        // Use a consistent secret for production (should be set in env, but fallback for Electron)
-        if (!process.env.NEXTAUTH_SECRET) {
-          process.env.NEXTAUTH_SECRET = 'posify-electron-secret-key-2024';
-        }
-        
-        console.log('NEXTAUTH_URL set to:', process.env.NEXTAUTH_URL);
-        
-        console.log('Loading Next.js server module...');
-        // Require the server directly - it will start automatically
-        require(absoluteServerPath);
-        console.log('Next.js server module loaded');
-        
-        // Give it a moment to start
-        setTimeout(() => {
-          process.chdir(originalCwd);
-          // Restore original env (optional, but cleaner)
-          Object.keys(process.env).forEach(key => {
-            if (!(key in originalEnv)) {
-              delete process.env[key];
-            }
-          });
-          Object.assign(process.env, originalEnv);
-          process.env.NODE_ENV = 'production';
-          process.env.PORT = String(actualPort);
-          process.env.HOSTNAME = '127.0.0.1';
-          
-          resolve();
-        }, 3000);
-      } catch (requireErr) {
-        console.error('Failed to require server module:', requireErr);
-        process.chdir(originalCwd);
-        Object.assign(process.env, originalEnv);
-        reject(new Error(`Failed to load server: ${requireErr.message}`));
+      } else if (fs.existsSync(staticPathAlt2)) {
+        console.log('✓ Static files found at resources location:', staticPathAlt2);
+      } else {
+        console.error('✗ WARNING: Static files not found in any location!');
       }
       
-      // Watch for port file to be created and update actualPort (optional)
+      // Spawn the server as a child process - CRITICAL for API routes to work
+      console.log('Spawning Next.js server process...');
+      serverProcess = spawn(process.execPath, [serverPath], {
+        cwd: serverDir,
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          PORT: String(actualPort),
+          HOSTNAME: '127.0.0.1',
+          ELECTRON_APP_PATH: serverDir,
+          PORT_FILE: portFile,
+          NEXT_RUNTIME: 'nodejs',
+          NEXTAUTH_URL: `http://127.0.0.1:${actualPort}`,
+          NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'posify-electron-secret-key-2024',
+        },
+        stdio: 'pipe',
+      });
+      
+      // Watch for port file to be created and update actualPort
       const checkPortFile = setInterval(() => {
         try {
           if (fs.existsSync(portFile)) {
@@ -771,8 +672,18 @@ function startNextServer() {
       // Stop checking after 10 seconds
       setTimeout(() => clearInterval(checkPortFile), 10000);
       
-      // Note: When requiring server directly, it runs in the same process
-      // No need for setupServerListeners or process cleanup
+      // Clean up port file on exit
+      serverProcess.on('exit', () => {
+        try {
+          if (fs.existsSync(portFile)) {
+            fs.unlinkSync(portFile);
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      });
+      
+      setupServerListeners(serverProcess, resolve, reject);
     }
   });
 }

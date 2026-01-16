@@ -172,12 +172,40 @@ export async function DELETE(
         where: { saleId: sale.id },
       });
 
-      // 7. Delete sale items
+      // 7. Delete accounting transactions associated with this sale
+      // First find transactions to delete their groups if needed
+      const transactions = await tx.transaction.findMany({
+        where: { saleId: sale.id },
+        select: { groupId: true }
+      });
+      
+      // Delete the transactions
+      await tx.transaction.deleteMany({
+        where: { saleId: sale.id },
+      });
+
+      // Cleanup empty transaction groups
+      const groupIds = transactions.map(t => t.groupId).filter((id): id is string => id !== null);
+      if (groupIds.length > 0) {
+        // Find groups that have no more transactions
+        for (const groupId of new Set(groupIds)) {
+          const count = await tx.transaction.count({
+            where: { groupId }
+          });
+          if (count === 0) {
+            await tx.transactionGroup.delete({
+              where: { id: groupId }
+            });
+          }
+        }
+      }
+
+      // 8. Delete sale items
       await tx.saleItem.deleteMany({
         where: { saleId: sale.id },
       });
 
-      // 8. Finally, delete the sale
+      // 9. Finally, delete the sale
       await tx.sale.delete({
         where: { id: sale.id },
       });

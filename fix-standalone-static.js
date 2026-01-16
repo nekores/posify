@@ -68,3 +68,47 @@ try {
 
 console.log('✓ Static files copied successfully!');
 
+// Patch the standalone server.js to write PORT_FILE
+const standaloneServerPath = path.join(process.cwd(), '.next/standalone/server.js');
+if (fs.existsSync(standaloneServerPath)) {
+  console.log('Patching standalone server.js to support PORT_FILE...');
+  let serverContent = fs.readFileSync(standaloneServerPath, 'utf8');
+  
+  // Check if already patched
+  if (!serverContent.includes('PORT_FILE')) {
+    // Find the line where the server starts listening and add port file writing
+    // The standalone server uses: server.listen(currentPort, hostname, ...)
+    // We need to add code to write the port file after the server starts
+    
+    const patchCode = `
+// Electron PORT_FILE support (injected by fix-standalone-static.js)
+const originalListen = require('http').Server.prototype.listen;
+require('http').Server.prototype.listen = function(...args) {
+  const result = originalListen.apply(this, args);
+  this.once('listening', () => {
+    const addr = this.address();
+    if (addr && process.env.PORT_FILE) {
+      try {
+        require('fs').writeFileSync(process.env.PORT_FILE, String(addr.port));
+        console.log('PORT_FILE written:', process.env.PORT_FILE, '->', addr.port);
+      } catch (e) {
+        console.error('Failed to write PORT_FILE:', e);
+      }
+    }
+  });
+  return result;
+};
+// End Electron PORT_FILE support
+
+`;
+    
+    // Prepend the patch to the server file
+    serverContent = patchCode + serverContent;
+    fs.writeFileSync(standaloneServerPath, serverContent);
+    console.log('✓ Patched standalone server.js with PORT_FILE support');
+  } else {
+    console.log('✓ Standalone server.js already has PORT_FILE support');
+  }
+} else {
+  console.warn('WARNING: standalone/server.js not found, skipping patch');
+}
