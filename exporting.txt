@@ -1,0 +1,23 @@
+# Development testing
+npm run dev              # Terminal 1
+npm run electron:dev     # Terminal 2
+
+# 1. Build Next.js
+npm run build
+
+# 2. Build DMG for macOS
+npm run electron:build:mac
+
+# The DMG will be in: dist/Posify-1.0.0.dmg
+
+
+
+npm run electron:build:mac:arm64
+
+
+Important notes
+Database required: Ensure PostgreSQL is running and configured in .env.local
+First build may take a few minutes to package dependencies
+Icons: The build works without icons. To add icons later, create public/icon.icns (512x512px)
+Security: On first launch, users may need to right-click → Open (macOS Gatekeeper)
+The DMG file will be created in the dist/ directory after running the build command. See BUILD_GUIDE.md for detailed instructions and troubleshooting.
