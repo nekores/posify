@@ -124,7 +124,7 @@ const menuItems: MenuItem[] = [
     title: 'Settings',
     path: '/settings',
     icon: <SettingsIcon />,
-    roles: ['ADMINISTRATOR'],
+    roles: ['ADMINISTRATOR', 'MANAGER'],
   },
 ];
 

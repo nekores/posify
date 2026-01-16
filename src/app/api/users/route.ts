@@ -20,10 +20,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Filter users based on role
+    let whereClause: any = {
+      status: 2, // Active users only
+    };
+
+    // Managers cannot see Admin users
+    if (currentUser.role === 'MANAGER') {
+      whereClause.role = {
+        not: 'ADMINISTRATOR',
+      };
+    }
+
     const users = await prisma.user.findMany({
-      where: {
-        status: 2, // Active users only
-      },
+      where: whereClause,
       include: {
         profile: true,
       },

@@ -71,6 +71,11 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Prevent self role modification
+    if (params.id === session.user.id && role !== undefined && role !== currentUser.role) {
+      return NextResponse.json({ error: 'Cannot change your own role' }, { status: 400 });
+    }
+
     // Role assignment restrictions
     if (currentUser.role === 'MANAGER') {
       // Manager cannot change roles to Admin
@@ -78,7 +83,7 @@ export async function PUT(
         return NextResponse.json({ error: 'Managers cannot assign Administrator role' }, { status: 403 });
       }
       // Manager cannot change Admin users' roles
-      if (targetUser.role === 'ADMINISTRATOR') {
+      if (targetUser.role === 'ADMINISTRATOR' && role !== undefined && role !== targetUser.role) {
         return NextResponse.json({ error: 'Managers cannot modify Administrator accounts' }, { status: 403 });
       }
     }

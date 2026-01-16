@@ -30,6 +30,7 @@ import {
   DialogContent,
   DialogActions,
   LinearProgress,
+  CircularProgress,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -62,6 +63,7 @@ import { Grid } from '@mui/material';
 import toast from 'react-hot-toast';
 import { IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Collapse, TablePagination } from '@mui/material';
 import { useAppStore } from '@/store/useStore';
+import { useSession } from 'next-auth/react';
 import { getCurrencySymbol } from '@/lib/currency';
 
 interface Settings {
@@ -114,8 +116,11 @@ interface BrandItem {
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
   const { themeMode, setThemeMode } = useAppStore();
   const [tabValue, setTabValue] = useState(0);
+  const userRole = session?.user?.role || 'USER';
+  const canManageUsers = userRole === 'ADMINISTRATOR' || userRole === 'MANAGER';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -137,6 +142,20 @@ export default function SettingsPage() {
   const [brandForm, setBrandForm] = useState({ name: '', description: '' });
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryStats, setCategoryStats] = useState<CategoryStats>({ totalProducts: 0, uncategorizedProducts: 0 });
+
+  // User Management state
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [userForm, setUserForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    role: 'USER',
+    firstName: '',
+    lastName: '',
+  });
 
   const [settings, setSettings] = useState<Settings>({
     storeName: '',
@@ -163,6 +182,7 @@ export default function SettingsPage() {
     fetchBackups();
     fetchCategories();
     fetchBrands();
+    fetchUsers();
   }, []);
 
   const fetchSettings = async () => {
@@ -216,6 +236,131 @@ export default function SettingsPage() {
       setBrands(data.data || []);
     } catch (error) {
       console.error('Error fetching brands:', error);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      if (response.ok) {
+        setUsers(data.users || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch users');
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const openUserDialog = (user?: any) => {
+    if (user) {
+      setEditingUser(user);
+      setUserForm({
+        username: user.username,
+        email: user.email,
+        password: '',
+        role: user.role,
+        firstName: user.profile?.firstName || '',
+        lastName: user.profile?.lastName || '',
+      });
+    } else {
+      setEditingUser(null);
+      setUserForm({
+        username: '',
+        email: '',
+        password: '',
+        role: 'USER',
+        firstName: '',
+        lastName: '',
+      });
+    }
+    setUserDialogOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      // Prevent self role modification
+      if (editingUser && editingUser.id === session?.user?.id && userForm.role !== editingUser.role) {
+        toast.error('Cannot change your own role');
+        return;
+      }
+
+      // Prevent managers from assigning Admin role
+      if (userRole === 'MANAGER' && userForm.role === 'ADMINISTRATOR') {
+        toast.error('Managers cannot assign Administrator role');
+        return;
+      }
+
+      if (!editingUser && !userForm.password) {
+        toast.error('Password is required for new users');
+        return;
+      }
+
+      const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
+      const method = editingUser ? 'PUT' : 'POST';
+
+      const body: any = {
+        username: userForm.username,
+        email: userForm.email,
+        role: userForm.role,
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+      };
+
+      if (!editingUser || userForm.password) {
+        body.password = userForm.password;
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || 'Failed to save user');
+        return;
+      }
+
+      toast.success(editingUser ? 'User updated' : 'User created');
+      setUserDialogOpen(false);
+      setEditingUser(null);
+      setUserForm({
+        username: '',
+        email: '',
+        password: '',
+        role: 'USER',
+        firstName: '',
+        lastName: '',
+      });
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to save user');
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.error || 'Failed to delete user');
+        return;
+      }
+
+      toast.success('User deleted');
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to delete user');
     }
   };
 
@@ -516,7 +661,9 @@ export default function SettingsPage() {
           <Tab label="POS Settings" icon={<Receipt />} iconPosition="start" />
           <Tab label="Categories" icon={<Category />} iconPosition="start" />
           <Tab label="Brands" icon={<LocalOffer />} iconPosition="start" />
-          <Tab label="User Management" icon={<PeopleIcon />} iconPosition="start" />
+          {canManageUsers && (
+            <Tab label="User Management" icon={<PeopleIcon />} iconPosition="start" />
+          )}
           <Tab label="System" icon={<SettingsIcon />} iconPosition="start" />
           <Tab label="Backup & Restore" icon={<Backup />} iconPosition="start" />
         </Tabs>
@@ -553,26 +700,6 @@ export default function SettingsPage() {
                 value={settings.storeEmail}
                 onChange={(e) => setSettings({ ...settings, storeEmail: e.target.value })}
               />
-            </Grid>
-            <Grid size={{xs:12, md:6}}>
-              <FormControl fullWidth>
-                <InputLabel>Currency</InputLabel>
-                <Select
-                  value={settings.currency}
-                  label="Currency"
-                  onChange={(e) => {
-                    const newCurrency = e.target.value;
-                    const newSymbol = getCurrencySymbol(newCurrency);
-                    setSettings({ ...settings, currency: newCurrency, currencySymbol: newSymbol });
-                  }}
-                >
-                  <MenuItem value="PKR">Pakistani Rupee (Rs)</MenuItem>
-                  <MenuItem value="USD">US Dollar ($)</MenuItem>
-                  <MenuItem value="EUR">Euro (€)</MenuItem>
-                  <MenuItem value="GBP">British Pound (£)</MenuItem>
-                  <MenuItem value="INR">Indian Rupee (₹)</MenuItem>
-                </Select>
-              </FormControl>
             </Grid>
             <Grid size={{xs:12, md:12}}>
               <TextField
@@ -1044,8 +1171,119 @@ export default function SettingsPage() {
         </Paper>
       )}
 
+      {/* User Management Tab */}
+      {canManageUsers && tabValue === 4 && (
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold">
+              User Management
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => openUserDialog()}
+            >
+              Add User
+            </Button>
+          </Box>
+          {usersLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableCell><strong>Name</strong></TableCell>
+                    <TableCell><strong>Username</strong></TableCell>
+                    <TableCell><strong>Email</strong></TableCell>
+                    <TableCell align="center"><strong>Role</strong></TableCell>
+                    <TableCell align="center"><strong>Status</strong></TableCell>
+                    <TableCell align="center"><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">No users found</TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => {
+                      const isCurrentUser = user.id === session?.user?.id;
+                      return (
+                      <TableRow key={user.id} hover sx={{ bgcolor: isCurrentUser ? 'action.hover' : 'inherit' }}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography fontWeight="medium">
+                              {user.profile?.firstName || user.profile?.lastName
+                                ? `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim()
+                                : user.username}
+                            </Typography>
+                            {isCurrentUser && (
+                              <Chip label="You" size="small" color="primary" variant="outlined" />
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={user.role}
+                            size="small"
+                            color={
+                              user.role === 'ADMINISTRATOR'
+                                ? 'error'
+                                : user.role === 'MANAGER'
+                                ? 'warning'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={user.status === 2 ? 'Active' : 'Inactive'}
+                            size="small"
+                            color={user.status === 2 ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <IconButton
+                            size="small"
+                            onClick={() => openUserDialog(user)}
+                            title="Edit user"
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={user.id === session?.user?.id || (userRole === 'MANAGER' && user.role === 'ADMINISTRATOR')}
+                            title={
+                              user.id === session?.user?.id 
+                                ? 'Cannot delete your own account'
+                                : userRole === 'MANAGER' && user.role === 'ADMINISTRATOR'
+                                ? 'Managers cannot delete Administrators'
+                                : 'Delete user'
+                            }
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+      )}
+
       {/* System Settings Tab */}
-      {tabValue === 4 && (
+      {tabValue === (canManageUsers ? 5 : 4) && (
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
             System Preferences
@@ -1078,12 +1316,32 @@ export default function SettingsPage() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid size={{xs:12, md:6}}>
+              <FormControl fullWidth>
+                <InputLabel>Currency</InputLabel>
+                <Select
+                  value={settings.currency}
+                  label="Currency"
+                  onChange={(e) => {
+                    const newCurrency = e.target.value;
+                    const newSymbol = getCurrencySymbol(newCurrency);
+                    setSettings({ ...settings, currency: newCurrency, currencySymbol: newSymbol });
+                  }}
+                >
+                  <MenuItem value="PKR">Pakistani Rupee (Rs)</MenuItem>
+                  <MenuItem value="USD">US Dollar ($)</MenuItem>
+                  <MenuItem value="EUR">Euro (€)</MenuItem>
+                  <MenuItem value="GBP">British Pound (£)</MenuItem>
+                  <MenuItem value="INR">Indian Rupee (₹)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
         </Paper>
       )}
 
       {/* Backup & Restore Tab */}
-      {tabValue === 5 && (
+      {tabValue === (canManageUsers ? 6 : 5) && (
         <Box>
           <Grid container spacing={3}>
             {/* Data Backup */}
@@ -1421,6 +1679,102 @@ export default function SettingsPage() {
             disabled={!brandForm.name}
           >
             {editingBrand ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* User Dialog */}
+      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {editingUser ? 'Edit User' : 'Add User'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  label="First Name"
+                  value={userForm.firstName}
+                  onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Last Name"
+                  value={userForm.lastName}
+                  onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Username *"
+                  value={userForm.username}
+                  onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
+                  required
+                  disabled={!!editingUser}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Email *"
+                  type="email"
+                  value={userForm.email}
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label={editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
+                  type="password"
+                  value={userForm.password}
+                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                  required={!editingUser}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Role *</InputLabel>
+                  <Select
+                    value={userForm.role}
+                    label="Role *"
+                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                    disabled={editingUser?.id === session?.user?.id}
+                  >
+                    <MenuItem value="USER">User</MenuItem>
+                    <MenuItem value="MANAGER">Manager</MenuItem>
+                    {userRole === 'ADMINISTRATOR' && (
+                      <MenuItem value="ADMINISTRATOR">Administrator</MenuItem>
+                    )}
+                  </Select>
+                  {editingUser?.id === session?.user?.id && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      You cannot change your own role
+                    </Typography>
+                  )}
+                  {userRole === 'MANAGER' && userForm.role === 'ADMINISTRATOR' && (
+                    <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                      Managers cannot assign Administrator role
+                    </Typography>
+                  )}
+                </FormControl>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveUser}
+            disabled={!userForm.username || !userForm.email || (!editingUser && !userForm.password)}
+          >
+            {editingUser ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

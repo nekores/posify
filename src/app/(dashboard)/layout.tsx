@@ -20,8 +20,14 @@ export default function DashboardLayout({
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
+    } else if (status === 'authenticated' && session?.user?.role === 'USER') {
+      // User role can only access POS, redirect to POS if trying to access other pages
+      const path = window.location.pathname;
+      if (path !== '/pos' && !path.startsWith('/pos/')) {
+        router.push('/pos');
+      }
     }
-  }, [status, router]);
+  }, [status, router, session]);
 
   // Sync currency from settings on mount
   useEffect(() => {
