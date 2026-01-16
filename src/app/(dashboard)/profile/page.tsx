@@ -121,7 +121,7 @@ export default function ProfilePage() {
   }
 
   const displayName = profile
-    ? `${profile.firstName} ${profile.lastName || ''}`.trim() || session?.user?.name
+    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || session?.user?.name || session?.user?.username || 'User'
     : session?.user?.name || session?.user?.username || 'User';
 
   return (
@@ -154,11 +154,11 @@ export default function ProfilePage() {
                     fontSize: '2.5rem',
                   }}
                 >
-                  {displayName.charAt(0).toUpperCase()}
+                  {(displayName || 'U').charAt(0).toUpperCase()}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h5" fontWeight="bold" gutterBottom>
-                    {displayName}
+                    {displayName || 'User'}
                   </Typography>
                   <Typography variant="body1" color="text.secondary" gutterBottom>
                     <EmailIcon sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
