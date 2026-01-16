@@ -15,5 +15,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Check if running in Electron
   isElectron: true,
+  
+  // Splash screen controls
+  retry: () => ipcRenderer.send('app-retry'),
+  quit: () => ipcRenderer.send('app-quit'),
+  onError: (callback) => ipcRenderer.on('show-error', (event, data) => callback(data)),
+  onStatus: (callback) => ipcRenderer.on('update-status', (event, message) => callback(message)),
 });
 

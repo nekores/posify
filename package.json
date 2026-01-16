@@ -92,6 +92,10 @@
     ],
     "extraResources": [
       {
+        "from": ".env",
+        "to": ".env"
+      },
+      {
         "from": "prisma",
         "to": "prisma"
       },

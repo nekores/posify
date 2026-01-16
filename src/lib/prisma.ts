@@ -10,7 +10,9 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// Cache the Prisma client in both development AND production
+// This is important for Electron apps to maintain a single connection
+globalForPrisma.prisma = prisma;
 
 export default prisma;
 

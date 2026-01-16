@@ -11,6 +11,48 @@ let actualPort = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// Load environment variables from .env file
+function loadEnvFile() {
+  const possibleEnvPaths = [
+    path.join(__dirname, '..', '.env'),
+    path.join(app.getAppPath(), '.env'),
+    path.join(process.resourcesPath || '', '.env'),
+    path.join(app.getPath('userData'), '.env'),
+  ];
+  
+  for (const envPath of possibleEnvPaths) {
+    try {
+      if (fs.existsSync(envPath)) {
+        console.log('Loading .env from:', envPath);
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const lines = envContent.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            const [key, ...valueParts] = trimmed.split('=');
+            if (key && valueParts.length > 0) {
+              const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+              if (!process.env[key]) {
+                process.env[key] = value;
+                console.log(`  Set ${key}=${value.substring(0, 20)}...`);
+              }
+            }
+          }
+        }
+        return true;
+      }
+    } catch (e) {
+      console.error('Error loading .env from', envPath, e);
+    }
+  }
+  
+  console.warn('No .env file found. Using default DATABASE_URL if not set.');
+  return false;
+}
+
+// Load env file early
+loadEnvFile();
+
 // Function to find an available port
 function findAvailablePort(startPort = 0) {
   return new Promise((resolve, reject) => {
@@ -34,6 +76,24 @@ function findAvailablePort(startPort = 0) {
   });
 }
 
+// Function to send error to splash window
+function showSplashError(errorType, message) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.executeJavaScript(`
+      window.postMessage({ type: 'error', errorType: '${errorType}', message: '${message.replace(/'/g, "\\'")}' }, '*');
+    `);
+  }
+}
+
+// Function to update splash status
+function updateSplashStatus(message) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.executeJavaScript(`
+      window.postMessage({ type: 'status', message: '${message.replace(/'/g, "\\'")}' }, '*');
+    `);
+  }
+}
+
 function createSplashWindow() {
   try {
     splashWindow = new BrowserWindow({
@@ -45,6 +105,7 @@ function createSplashWindow() {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
       },
     });
 
@@ -636,54 +697,71 @@ function startNextServer() {
         console.error('✗ WARNING: Static files not found in any location!');
       }
       
-      // Spawn the server as a child process - CRITICAL for API routes to work
-      console.log('Spawning Next.js server process...');
-      serverProcess = spawn(process.execPath, [serverPath], {
-        cwd: serverDir,
-        env: {
-          ...process.env,
-          NODE_ENV: 'production',
-          PORT: String(actualPort),
-          HOSTNAME: '127.0.0.1',
-          ELECTRON_APP_PATH: serverDir,
-          PORT_FILE: portFile,
-          NEXT_RUNTIME: 'nodejs',
-          NEXTAUTH_URL: `http://127.0.0.1:${actualPort}`,
-          NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'posify-electron-secret-key-2024',
-        },
-        stdio: 'pipe',
-      });
+      // Run the server in the same process using require()
+      // Note: We must set up the environment before requiring the server
+      console.log('Starting Next.js server in-process...');
       
-      // Watch for port file to be created and update actualPort
-      const checkPortFile = setInterval(() => {
-        try {
-          if (fs.existsSync(portFile)) {
-            const portFromFile = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
-            if (portFromFile && portFromFile !== actualPort) {
-              console.log('Server bound to port:', portFromFile);
-              actualPort = portFromFile;
+      // Change to server directory and set environment
+      const originalCwd = process.cwd();
+      
+      try {
+        process.chdir(serverDir);
+        process.env.NODE_ENV = 'production';
+        process.env.PORT = String(actualPort);
+        process.env.HOSTNAME = '127.0.0.1';
+        process.env.ELECTRON_APP_PATH = serverDir;
+        process.env.PORT_FILE = portFile;
+        process.env.NEXT_RUNTIME = 'nodejs';
+        process.env.NEXTAUTH_URL = `http://127.0.0.1:${actualPort}`;
+        if (!process.env.NEXTAUTH_SECRET) {
+          process.env.NEXTAUTH_SECRET = 'posify-electron-secret-key-2024';
+        }
+        
+        // Ensure DATABASE_URL is set (should have been loaded from .env)
+        if (!process.env.DATABASE_URL) {
+          console.error('WARNING: DATABASE_URL is not set! Database operations will fail.');
+        } else {
+          console.log('  DATABASE_URL:', process.env.DATABASE_URL.substring(0, 30) + '...');
+        }
+        
+        console.log('Environment configured, loading server module...');
+        console.log('  CWD:', process.cwd());
+        console.log('  PORT:', process.env.PORT);
+        console.log('  NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+        
+        // Require the standalone server - it will start automatically
+        require(serverPath);
+        console.log('Next.js server module loaded');
+        
+        // Watch for port file to be created and update actualPort
+        const checkPortFile = setInterval(() => {
+          try {
+            if (fs.existsSync(portFile)) {
+              const portFromFile = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
+              if (portFromFile && portFromFile !== actualPort) {
+                console.log('Server bound to port:', portFromFile);
+                actualPort = portFromFile;
+              }
             }
+          } catch (e) {
+            // Ignore read errors
           }
-        } catch (e) {
-          // Ignore read errors
-        }
-      }, 500);
-      
-      // Stop checking after 10 seconds
-      setTimeout(() => clearInterval(checkPortFile), 10000);
-      
-      // Clean up port file on exit
-      serverProcess.on('exit', () => {
-        try {
-          if (fs.existsSync(portFile)) {
-            fs.unlinkSync(portFile);
-          }
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      });
-      
-      setupServerListeners(serverProcess, resolve, reject);
+        }, 500);
+        
+        // Stop checking after 10 seconds
+        setTimeout(() => clearInterval(checkPortFile), 10000);
+        
+        // Give server time to start, then resolve
+        setTimeout(() => {
+          process.chdir(originalCwd);
+          resolve();
+        }, 3000);
+        
+      } catch (requireErr) {
+        console.error('Failed to load server module:', requireErr);
+        process.chdir(originalCwd);
+        reject(new Error(`Failed to load server: ${requireErr.message}`));
+      }
     }
   });
 }
@@ -767,38 +845,116 @@ function setupServerListeners(server, resolve, reject) {
   }, 15000);
 }
 
+// Function to start the application
+async function startApplication() {
+  try {
+    updateSplashStatus('Starting server...');
+    await startNextServer();
+    
+    updateSplashStatus('Checking database connection...');
+    
+    // Test database connection by making a request to an API endpoint
+    const testDbConnection = () => {
+      return new Promise((resolve, reject) => {
+        const http = require('http');
+        const testUrl = `http://127.0.0.1:${actualPort}/api/settings`;
+        
+        const req = http.get(testUrl, { timeout: 10000 }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              if (json.error && json.error.includes('database')) {
+                reject(new Error('Database connection failed'));
+              } else {
+                resolve(true);
+              }
+            } catch (e) {
+              // If we got a response, server is at least running
+              resolve(true);
+            }
+          });
+        });
+        
+        req.on('error', (err) => {
+          reject(new Error(`Server not responding: ${err.message}`));
+        });
+        
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error('Connection timeout'));
+        });
+      });
+    };
+    
+    // Wait a bit for server to fully initialize, then test DB
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    try {
+      await testDbConnection();
+      updateSplashStatus('Ready!');
+      createWindow();
+    } catch (dbError) {
+      console.error('Database connection test failed:', dbError);
+      showSplashError('database', 'Unable to connect to the database. Please ensure PostgreSQL is running and try again.');
+    }
+    
+  } catch (error) {
+    console.error('Failed to start application:', error);
+    const errorMessage = error.message || 'Unknown error';
+    
+    if (errorMessage.includes('database') || errorMessage.includes('ECONNREFUSED')) {
+      showSplashError('database', 'Unable to connect to the database. Please ensure PostgreSQL is running and try again.');
+    } else {
+      showSplashError('server', `Failed to start server: ${errorMessage}`);
+    }
+  }
+}
+
+// IPC handlers for splash screen
+const { ipcMain } = require('electron');
+
+ipcMain.on('app-retry', () => {
+  console.log('Retry requested from splash screen');
+  // Reset and try again
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+    mainWindow = null;
+  }
+  startApplication();
+});
+
+ipcMain.on('app-quit', () => {
+  console.log('Quit requested from splash screen');
+  app.quit();
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
   try {
     // Show splash screen immediately
     createSplashWindow();
     
-    // Start server and create window
-    startNextServer().catch((err) => {
-      console.error('Failed to start server:', err);
-      if (splashWindow) splashWindow.close();
-      const { dialog } = require('electron');
-      dialog.showErrorBox('Startup Error', `Failed to start server: ${err.message}`);
-    });
+    // Start the application
+    startApplication();
     
-    createWindow();
   } catch (error) {
     console.error('Error in app.whenReady:', error);
-    const { dialog } = require('electron');
-    dialog.showErrorBox('Startup Error', `Application failed to start: ${error.message}`);
+    showSplashError('server', `Application failed to start: ${error.message}`);
   }
 });
 
 app.on('window-all-closed', () => {
   if (serverProcess) serverProcess.kill();
-  if (splashWindow) splashWindow.close();
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createSplashWindow();
-    createWindow();
+    startApplication();
   }
 });
 

@@ -54,7 +54,19 @@ export default function TaxManagementPage() {
       setLoading(true);
       const res = await fetch('/api/tax/stats');
       const data = await res.json();
-      setStats(data);
+      
+      // Check if the response contains an error
+      if (data.error) {
+        console.error('API returned error:', data.error, data.details);
+        return;
+      }
+      
+      // Validate the response has the expected structure
+      if (typeof data.thisYear === 'number' && typeof data.thisMonth === 'number') {
+        setStats(data);
+      } else {
+        console.error('Invalid tax stats response:', data);
+      }
     } catch (error) {
       console.error('Error fetching tax stats:', error);
     } finally {

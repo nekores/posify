@@ -24,6 +24,7 @@
     .container {
       text-align: center;
       color: white;
+      padding: 20px;
     }
     
     .logo {
@@ -37,6 +38,12 @@
       margin: 0 auto 32px;
       box-shadow: 0 8px 32px rgba(17, 153, 142, 0.4);
       animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .logo.error {
+      background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+      box-shadow: 0 8px 32px rgba(235, 51, 73, 0.4);
+      animation: none;
     }
     
     .logo svg {
@@ -61,6 +68,13 @@
       font-weight: 700;
       margin-bottom: 8px;
       background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    h1.error {
+      background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -147,51 +161,223 @@
         transform: translateX(0);
       }
     }
+    
+    /* Error State */
+    .error-container {
+      display: none;
+      margin-top: 24px;
+    }
+    
+    .error-container.show {
+      display: block;
+    }
+    
+    .error-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+    }
+    
+    .error-icon svg {
+      width: 100%;
+      height: 100%;
+      fill: #f45c43;
+    }
+    
+    .error-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f45c43;
+      margin-bottom: 12px;
+    }
+    
+    .error-message {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 24px;
+      line-height: 1.5;
+      max-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .retry-button {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      border: none;
+      color: white;
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 16px rgba(17, 153, 142, 0.4);
+    }
+    
+    .retry-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(17, 153, 142, 0.5);
+    }
+    
+    .retry-button:active {
+      transform: translateY(0);
+    }
+    
+    .quit-button {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.7);
+      padding: 10px 24px;
+      font-size: 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-left: 12px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    
+    .quit-button:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .loading-state {
+      display: block;
+    }
+    
+    .loading-state.hidden {
+      display: none;
+    }
+    
+    .button-group {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo">
+    <div class="logo" id="logo">
       <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
       </svg>
     </div>
-    <h1>Posify</h1>
+    <h1 id="title">Posify</h1>
     <p class="subtitle">Point of Sale System</p>
-    <div class="loader">
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
+    
+    <!-- Loading State -->
+    <div class="loading-state" id="loadingState">
+      <div class="loader">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+      <p class="status" id="status">Starting application...</p>
     </div>
-    <div class="progress-bar">
-      <div class="progress-fill"></div>
+    
+    <!-- Error State -->
+    <div class="error-container" id="errorContainer">
+      <div class="error-title" id="errorTitle">Connection Error</div>
+      <p class="error-message" id="errorMessage">
+        Unable to connect to the database. Please ensure PostgreSQL is running and try again.
+      </p>
+      <div class="button-group">
+        <button class="retry-button" id="retryButton">Try Again</button>
+        <button class="quit-button" id="quitButton">Quit</button>
+      </div>
     </div>
-    <p class="status" id="status">Starting application...</p>
   </div>
   
   <script>
     const statusEl = document.getElementById('status');
+    const loadingState = document.getElementById('loadingState');
+    const errorContainer = document.getElementById('errorContainer');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorMessage = document.getElementById('errorMessage');
+    const logo = document.getElementById('logo');
+    const title = document.getElementById('title');
+    const retryButton = document.getElementById('retryButton');
+    const quitButton = document.getElementById('quitButton');
+    
     const messages = [
       'Starting application...',
       'Loading server...',
-      'Initializing database...',
+      'Connecting to database...',
       'Almost ready...'
     ];
     
     let messageIndex = 0;
-    const interval = setInterval(() => {
+    let interval = setInterval(() => {
       messageIndex = (messageIndex + 1) % messages.length;
       statusEl.textContent = messages[messageIndex];
     }, 2000);
     
-    // Listen for ready signal from main process
-    if (window.electronAPI) {
-      window.electronAPI.onReady(() => {
+    // Function to show error state
+    function showError(errorType, message) {
+      clearInterval(interval);
+      loadingState.classList.add('hidden');
+      errorContainer.classList.add('show');
+      logo.classList.add('error');
+      title.classList.add('error');
+      
+      if (errorType === 'database') {
+        errorTitle.textContent = 'Database Connection Error';
+        errorMessage.textContent = message || 'Unable to connect to the database. Please ensure PostgreSQL is running and try again.';
+      } else if (errorType === 'server') {
+        errorTitle.textContent = 'Server Error';
+        errorMessage.textContent = message || 'Failed to start the application server. Please try again.';
+      } else {
+        errorTitle.textContent = 'Error';
+        errorMessage.textContent = message || 'An unexpected error occurred. Please try again.';
+      }
+    }
+    
+    // Function to reset to loading state
+    function resetToLoading() {
+      loadingState.classList.remove('hidden');
+      errorContainer.classList.remove('show');
+      logo.classList.remove('error');
+      title.classList.remove('error');
+      statusEl.textContent = 'Retrying...';
+      
+      messageIndex = 0;
+      interval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % messages.length;
+        statusEl.textContent = messages[messageIndex];
+      }, 2000);
+    }
+    
+    // Button handlers - these will be connected via IPC
+    retryButton.addEventListener('click', () => {
+      resetToLoading();
+      if (window.electronAPI && window.electronAPI.retry) {
+        window.electronAPI.retry();
+      }
+    });
+    
+    quitButton.addEventListener('click', () => {
+      if (window.electronAPI && window.electronAPI.quit) {
+        window.electronAPI.quit();
+      }
+    });
+    
+    // Listen for messages from main process
+    window.addEventListener('message', (event) => {
+      const { type, errorType, message } = event.data;
+      if (type === 'error') {
+        showError(errorType, message);
+      } else if (type === 'status') {
+        statusEl.textContent = message;
+      } else if (type === 'ready') {
         clearInterval(interval);
         statusEl.textContent = 'Ready!';
-      });
-    }
+      }
+    });
   </script>
 </body>
 </html>
-
