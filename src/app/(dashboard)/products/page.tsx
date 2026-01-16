@@ -42,6 +42,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { useFormatCurrency } from '@/lib/currency';
+import { useAppStore } from '@/store/useStore';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -81,6 +83,8 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  const formatCurrency = useFormatCurrency();
+  const { currencySymbol } = useAppStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -420,8 +424,8 @@ export default function ProductsPage() {
                         </Box>
                       </TableCell>
                       <TableCell>{product.category?.name || '-'}</TableCell>
-                      <TableCell align="right">Rs. {product.costPrice}</TableCell>
-                      <TableCell align="right">Rs. {product.salePrice}</TableCell>
+                      <TableCell align="right">{formatCurrency(product.costPrice)}</TableCell>
+                      <TableCell align="right">{formatCurrency(product.salePrice)}</TableCell>
                       <TableCell align="right">
                         <Chip
                           label={product.stock}
@@ -563,7 +567,7 @@ export default function ProductsPage() {
                   error={!!errors.costPrice}
                   helperText={errors.costPrice?.message}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                   }}
                 />
               </Grid>
@@ -576,7 +580,7 @@ export default function ProductsPage() {
                   error={!!errors.salePrice}
                   helperText={errors.salePrice?.message}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                   }}
                 />
               </Grid>

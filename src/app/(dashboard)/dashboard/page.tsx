@@ -37,6 +37,8 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { useFormatCurrency } from '@/lib/currency';
+import { useAppStore } from '@/store/useStore';
 
 ChartJS.register(
   CategoryScale,
@@ -182,6 +184,8 @@ function StatCard({ title, value, icon, color, trend, trendUp = true, subtitle, 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const formatCurrency = useFormatCurrency();
+  const { currencySymbol } = useAppStore();
 
   useEffect(() => {
     fetchDashboardData();
@@ -199,10 +203,6 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `Rs. ${amount.toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -251,7 +251,7 @@ export default function DashboardPage() {
         callbacks: {
           label: (context: any) => {
             const value = context.parsed?.y;
-            return value != null ? `Sales: Rs. ${value.toLocaleString()}` : '';
+            return value != null ? `Sales: ${formatCurrency(value)}` : '';
           },
         },
       },
@@ -263,7 +263,7 @@ export default function DashboardPage() {
           color: 'rgba(0, 0, 0, 0.05)',
         },
         ticks: {
-          callback: (value: number | string) => `Rs. ${Number(value).toLocaleString()}`,
+          callback: (value: number | string) => formatCurrency(Number(value)),
         },
       },
       x: {
@@ -304,7 +304,7 @@ export default function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="Today's Sales"
-            value={data ? formatCurrency(data.todaySales.total) : 'Rs. 0'}
+            value={data ? formatCurrency(data.todaySales.total) : formatCurrency(0)}
             icon={<SalesIcon sx={{ fontSize: 32 }} />}
             color="#4caf50"
             subtitle={data ? `${data.todaySales.count} transactions` : undefined}
@@ -314,7 +314,7 @@ export default function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="This Month"
-            value={data ? formatCurrency(data.monthSales.total) : 'Rs. 0'}
+            value={data ? formatCurrency(data.monthSales.total) : formatCurrency(0)}
             icon={<MoneyIcon sx={{ fontSize: 32 }} />}
             color="#2196f3"
             subtitle={data ? `${data.monthSales.count} transactions` : undefined}
@@ -346,7 +346,7 @@ export default function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="Cash in Hand"
-            value={data ? formatCurrency(data.cashInHand) : 'Rs. 0'}
+            value={data ? formatCurrency(data.cashInHand) : formatCurrency(0)}
             icon={<MoneyIcon sx={{ fontSize: 32 }} />}
             color="#00bcd4"
             loading={loading}
@@ -355,7 +355,7 @@ export default function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="Today's Expenses"
-            value={data ? formatCurrency(data.todayExpenses) : 'Rs. 0'}
+            value={data ? formatCurrency(data.todayExpenses) : formatCurrency(0)}
             icon={<ExpensesIcon sx={{ fontSize: 32 }} />}
             color="#f44336"
             loading={loading}

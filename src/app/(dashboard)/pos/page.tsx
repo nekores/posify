@@ -56,8 +56,9 @@ import {
   AccountBalance as BankIcon,
   Sell as SellIcon,
 } from '@mui/icons-material';
-import { usePOSStore } from '@/store/useStore';
+import { usePOSStore, useAppStore } from '@/store/useStore';
 import toast from 'react-hot-toast';
+import { useFormatCurrency } from '@/lib/currency';
 
 interface Product {
   id: string;
@@ -85,6 +86,8 @@ interface Customer {
 }
 
 export default function POSPage() {
+  const formatCurrency = useFormatCurrency();
+  const { currencySymbol } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -281,7 +284,7 @@ export default function POSPage() {
       const validPrice = Math.max(newPrice, minPrice);
       
       if (newPrice < minPrice) {
-        toast.error(`Price cannot be below cost (Rs. ${minPrice})`);
+        toast.error(`Price cannot be below cost (${formatCurrency(minPrice)})`);
       }
       
       // Recalculate tax when price changes
@@ -372,7 +375,7 @@ export default function POSPage() {
           
           if (cashInHand < currentBill) {
             toast.error(
-              `Insufficient Cash in Hand!\n\nRequired: Rs. ${currentBill.toLocaleString()}\nAvailable: Rs. ${cashInHand.toLocaleString()}\n\nCannot process return.`,
+              `Insufficient Cash in Hand!\n\nRequired: ${formatCurrency(currentBill)}\nAvailable: ${formatCurrency(cashInHand)}\n\nCannot process return.`,
               { duration: 5000 }
             );
             return;
@@ -433,7 +436,7 @@ export default function POSPage() {
         ? 'Return processed successfully!' 
         : isCashSale 
           ? 'Sale completed successfully!'
-          : `Credit sale completed! Rs. ${currentBill.toLocaleString()} added to ${customerName}'s balance`;
+          : `Credit sale completed! ${formatCurrency(currentBill)} added to ${customerName}'s balance`;
       
       toast.success(successMsg);
       resetToWalkIn(); // Reset to Walk-in Customer for next sale
@@ -562,7 +565,7 @@ export default function POSPage() {
                           </Typography>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                             <Typography variant="subtitle1" color="primary" fontWeight="bold">
-                              Rs. {product.salePrice.toLocaleString()}
+                              {formatCurrency(product.salePrice)}
                             </Typography>
                             <Chip
                               label={product.stock}
@@ -676,7 +679,7 @@ export default function POSPage() {
                 endIcon={
                   !isWalkInCustomer && customerOldBalance > 0 ? (
                     <Chip 
-                      label={`Due: Rs. ${customerOldBalance.toLocaleString()}`} 
+                      label={`Due: ${formatCurrency(customerOldBalance)}`} 
                       size="small" 
                       color="warning"
                       sx={{ fontWeight: 'bold' }}
@@ -718,7 +721,7 @@ export default function POSPage() {
                             {item.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            Rs. {item.unitPrice}
+                            {formatCurrency(item.unitPrice)}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
@@ -788,19 +791,19 @@ export default function POSPage() {
             <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', flexShrink: 0, bgcolor: 'background.paper' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Subtotal</Typography>
-                <Typography>Rs. {subtotal.toFixed(2)}</Typography>
+                <Typography>{formatCurrency(subtotal)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Discount</Typography>
-                <Typography color="error">- Rs. {discount.toFixed(2)}</Typography>
+                <Typography color="error">- {formatCurrency(discount)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Tax</Typography>
-                <Typography color="primary">Rs. {totalTax.toFixed(2)}</Typography>
+                <Typography color="primary">{formatCurrency(totalTax)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography>Current Bill</Typography>
-                <Typography fontWeight="medium">Rs. {total.toFixed(2)}</Typography>
+                <Typography fontWeight="medium">{formatCurrency(total)}</Typography>
               </Box>
               {!isWalkInCustomer && customerOldBalance > 0 && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, bgcolor: saleMode === 'return' ? 'grey.200' : 'warning.light', mx: -2, px: 2, py: 0.5 }}>
@@ -808,7 +811,7 @@ export default function POSPage() {
                     Previous Balance {saleMode === 'return' && '(info only)'}
                   </Typography>
                   <Typography color={saleMode === 'return' ? 'text.secondary' : 'warning.dark'} fontWeight="bold">
-                    Rs. {customerOldBalance.toLocaleString()}
+                    {formatCurrency(customerOldBalance)}
                   </Typography>
                 </Box>
               )}
@@ -818,7 +821,7 @@ export default function POSPage() {
                   {saleMode === 'return' ? 'Refund Amount' : (!isWalkInCustomer && customerOldBalance > 0 ? 'Grand Total' : 'Total')}
                 </Typography>
                 <Typography variant="h6" fontWeight="bold" color={saleMode === 'return' ? 'warning.main' : 'primary'}>
-                  Rs. {grandTotal.toFixed(2)}
+                  {formatCurrency(grandTotal)}
                 </Typography>
               </Box>
 
@@ -836,7 +839,7 @@ export default function POSPage() {
                       onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
                       placeholder={grandTotal.toFixed(2)}
                       InputProps={{
-                        startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                        startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                       }}
                       sx={{ 
                         flex: 1,
@@ -849,7 +852,7 @@ export default function POSPage() {
                     {[grandTotal, 500, 1000, 2000, 5000].map((amount) => (
                       <Chip
                         key={amount}
-                        label={amount === grandTotal ? 'Exact' : `Rs. ${amount.toFixed(2)}`}
+                        label={amount === grandTotal ? 'Exact' : formatCurrency(amount)}
                         size="small"
                         variant={cashReceived === amount ? 'filled' : 'outlined'}
                         color={amount === grandTotal ? 'success' : 'default'}
@@ -877,7 +880,7 @@ export default function POSPage() {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Typography fontWeight="bold" color="error.dark">Short for Bill:</Typography>
                               <Typography variant="h6" fontWeight="bold" color="error.dark">
-                                Rs. {(total - cashReceived).toFixed(2)}
+                                {formatCurrency(total - cashReceived)}
                               </Typography>
                             </Box>
                           </Box>
@@ -891,14 +894,14 @@ export default function POSPage() {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                               <Typography variant="body2" color="info.dark">Pays Bill:</Typography>
                               <Typography variant="body2" fontWeight="bold" color="info.dark">
-                                Rs. {total.toFixed(2)}
+                                {formatCurrency(total)}
                               </Typography>
                             </Box>
                             {collectionAmount > 0 && (
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                                 <Typography variant="body2" color="success.dark">→ Collection:</Typography>
                                 <Typography variant="body2" fontWeight="bold" color="success.dark">
-                                  Rs. {collectionAmount.toLocaleString()}
+                                  {formatCurrency(collectionAmount)}
                                 </Typography>
                               </Box>
                             )}
@@ -906,14 +909,14 @@ export default function POSPage() {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                               <Typography fontWeight="bold" color="warning.dark">New Balance:</Typography>
                               <Typography variant="h6" fontWeight="bold" color="warning.dark">
-                                Rs. {remainingBalance.toLocaleString()}
+                                {formatCurrency(remainingBalance)}
                               </Typography>
                             </Box>
                             {excessAfterBill > customerOldBalance && (
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, bgcolor: 'success.main', mx: -1, px: 1, py: 0.5, borderRadius: 1 }}>
                                 <Typography fontWeight="bold" color="white">Change:</Typography>
                                 <Typography variant="h6" fontWeight="bold" color="white">
-                                  Rs. {(excessAfterBill - customerOldBalance).toLocaleString()}
+                                  {formatCurrency(excessAfterBill - customerOldBalance)}
                                 </Typography>
                               </Box>
                             )}
@@ -942,7 +945,7 @@ export default function POSPage() {
                             fontWeight="bold" 
                             color={cashReceived >= total ? 'success.dark' : 'error.dark'}
                           >
-                            Rs. {Math.abs(cashReceived - total).toFixed(2)}
+                            {formatCurrency(Math.abs(cashReceived - total))}
                           </Typography>
                         </Box>
                       );
@@ -1075,7 +1078,7 @@ export default function POSPage() {
             {!isWalkInCustomer && customerOldBalance > 0 ? 'Grand Total (incl. balance)' : 'Amount to Pay'}
           </Typography>
           <Typography variant="h3" fontWeight="bold">
-            Rs. {grandTotal.toFixed(2)}
+            {formatCurrency(grandTotal)}
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
             {cart.length} item{cart.length !== 1 ? 's' : ''} • {customerName}
@@ -1084,11 +1087,11 @@ export default function POSPage() {
             <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                 <Typography variant="body2">Current Bill:</Typography>
-                <Typography variant="body2" fontWeight="bold">Rs. {total.toFixed(2)}</Typography>
+                <Typography variant="body2" fontWeight="bold">{formatCurrency(total)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2">Previous Balance:</Typography>
-                <Typography variant="body2" fontWeight="bold">Rs. {customerOldBalance.toLocaleString()}</Typography>
+                <Typography variant="body2" fontWeight="bold">{formatCurrency(customerOldBalance)}</Typography>
               </Box>
             </Box>
           )}
@@ -1133,7 +1136,7 @@ export default function POSPage() {
             onChange={(e) => setPayment(paymentType, Number(e.target.value))}
             placeholder="0"
             InputProps={{
-              startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
               sx: { fontSize: '1.25rem', fontWeight: 'bold' }
             }}
             sx={{
@@ -1148,7 +1151,7 @@ export default function POSPage() {
             {[grandTotal, Math.ceil(grandTotal / 100) * 100, Math.ceil(grandTotal / 500) * 500, Math.ceil(grandTotal / 1000) * 1000].filter((v, i, a) => a.indexOf(v) === i).slice(0, 4).map((amount) => (
               <Chip
                 key={amount}
-                label={`Rs. ${amount.toFixed(2)}`}
+                label={formatCurrency(amount)}
                 onClick={() => setPayment(paymentType, amount)}
                 variant={amountPaid === amount ? 'filled' : 'outlined'}
                 color={amountPaid === amount ? 'primary' : 'default'}
@@ -1172,7 +1175,7 @@ export default function POSPage() {
                 {amountPaid >= grandTotal ? '🎉 Change to Return' : '⚠️ Balance (Credit)'}
               </Typography>
               <Typography variant="h4" fontWeight="bold" color={amountPaid >= grandTotal ? 'success.main' : 'warning.main'}>
-                Rs. {Math.abs(grandTotal - amountPaid).toFixed(2)}
+                {formatCurrency(Math.abs(grandTotal - amountPaid))}
               </Typography>
             </Box>
           )}
@@ -1210,7 +1213,7 @@ export default function POSPage() {
         <DialogContent>
           <Autocomplete
             options={customers}
-            getOptionLabel={(option) => `${option.name}${option.customerType ? ` [${option.customerType.name}]` : ''}${option.balance ? ` (Bal: Rs.${Number(option.balance).toLocaleString()})` : ''}`}
+            getOptionLabel={(option) => `${option.name}${option.customerType ? ` [${option.customerType.name}]` : ''}${option.balance ? ` (Bal: ${formatCurrency(Number(option.balance))})` : ''}`}
             renderInput={(params) => (
               <TextField {...params} label="Search Customer" margin="normal" />
             )}
@@ -1226,7 +1229,7 @@ export default function POSPage() {
                     )}
                   </Box>
                   {option.balance > 0 && (
-                    <Chip label={`Bal: Rs.${Number(option.balance).toLocaleString()}`} size="small" color="error" />
+                    <Chip label={`Bal: ${formatCurrency(Number(option.balance))}`} size="small" color="error" />
                   )}
                 </Box>
               </li>
@@ -1253,7 +1256,7 @@ export default function POSPage() {
                   
                   // Show balance info
                   if (oldBalance > 0) {
-                    toast.success(`Customer has Rs ${oldBalance.toLocaleString()} previous balance`);
+                    toast.success(`Customer has ${formatCurrency(oldBalance)} previous balance`);
                   }
                   
                   // Auto-apply discount based on customer type
@@ -1328,7 +1331,7 @@ export default function POSPage() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body1" fontWeight="bold">Total</Typography>
                 <Typography variant="body1" fontWeight="bold" color="primary.main">
-                  Rs. {getTotal().toLocaleString()}
+                  {formatCurrency(getTotal())}
                 </Typography>
               </Box>
             </CardContent>
@@ -1526,7 +1529,7 @@ export default function POSPage() {
                         borderColor: 'divider'
                       }}>
                         <Typography variant="h6" color="primary.main" fontWeight="bold">
-                          Rs. {saleTotal.toLocaleString()}
+                          {formatCurrency(saleTotal)}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button

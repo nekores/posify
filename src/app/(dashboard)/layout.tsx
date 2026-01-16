@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import MainLayout from '@/components/layout/MainLayout';
 import NavigationProgress from '@/components/layout/NavigationProgress';
+import { useAppStore } from '@/store/useStore';
 
 export default function DashboardLayout({
   children,
@@ -14,12 +15,20 @@ export default function DashboardLayout({
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { syncCurrencyFromSettings } = useAppStore();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
+
+  // Sync currency from settings on mount
+  useEffect(() => {
+    if (status === 'authenticated') {
+      syncCurrencyFromSettings();
+    }
+  }, [status, syncCurrencyFromSettings]);
 
   if (status === 'loading') {
     return (

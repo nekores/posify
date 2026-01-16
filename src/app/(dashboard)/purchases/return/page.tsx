@@ -47,6 +47,7 @@ import { Grid } from '@mui/material';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useAppStore } from '@/store/useStore';
 
 interface Supplier {
   id: string;
@@ -77,6 +78,7 @@ interface ReturnItem {
 }
 
 export default function ReturnPurchasePage() {
+  const { currencySymbol } = useAppStore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -626,7 +628,7 @@ export default function ReturnPurchasePage() {
               onChange={(e) => setRefundReceived(Number(e.target.value))}
               disabled={paymentType === 'credit'}
               InputProps={{
-                startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
               }}
               color="warning"
             />

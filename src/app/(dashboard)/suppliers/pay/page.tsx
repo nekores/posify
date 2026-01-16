@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { Grid } from '@mui/material';
+import { useAppStore } from '@/store/useStore';
 
 interface Supplier {
   id: string;
@@ -54,6 +55,7 @@ interface Purchase {
 }
 
 export default function PaySupplierPage() {
+  const { currencySymbol } = useAppStore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const preSelectedSupplierId = searchParams.get('supplierId');
@@ -257,7 +259,7 @@ export default function PaySupplierPage() {
                   value={paymentAmount || ''}
                   onChange={(e) => setPaymentAmount(Number(e.target.value))}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                   }}
                   helperText={selectedSupplier ? `Max: Rs ${Number(selectedSupplier.balance).toLocaleString()}` : ''}
                 />

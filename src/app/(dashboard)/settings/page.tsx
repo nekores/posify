@@ -56,11 +56,13 @@ import {
   Folder,
   FolderOpen,
   Inventory,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import { Grid } from '@mui/material';
 import toast from 'react-hot-toast';
 import { IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Collapse, TablePagination } from '@mui/material';
 import { useAppStore } from '@/store/useStore';
+import { getCurrencySymbol } from '@/lib/currency';
 
 interface Settings {
   storeName: string;
@@ -168,7 +170,14 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings');
       const data = await response.json();
       if (data.settings) {
-        setSettings({ ...settings, ...data.settings });
+        // Ensure currencySymbol is set based on currency if not present
+        const currency = data.settings.currency || 'PKR';
+        const currencySymbol = data.settings.currencySymbol || getCurrencySymbol(currency);
+        setSettings({ ...settings, ...data.settings, currency, currencySymbol });
+        
+        // Also update the app store
+        const { setSettings: setStoreSettings } = useAppStore.getState();
+        setStoreSettings({ currency, currencySymbol });
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -382,6 +391,12 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
+        // Update the app store with new currency settings
+        const { setSettings: setStoreSettings, syncCurrencyFromSettings } = useAppStore.getState();
+        setStoreSettings({ 
+          currency: settings.currency, 
+          currencySymbol: settings.currencySymbol 
+        });
         setSnackbar({ open: true, message: 'Settings saved successfully!', severity: 'success' });
       } else {
         throw new Error('Failed to save');
@@ -501,6 +516,7 @@ export default function SettingsPage() {
           <Tab label="POS Settings" icon={<Receipt />} iconPosition="start" />
           <Tab label="Categories" icon={<Category />} iconPosition="start" />
           <Tab label="Brands" icon={<LocalOffer />} iconPosition="start" />
+          <Tab label="User Management" icon={<PeopleIcon />} iconPosition="start" />
           <Tab label="System" icon={<SettingsIcon />} iconPosition="start" />
           <Tab label="Backup & Restore" icon={<Backup />} iconPosition="start" />
         </Tabs>
@@ -544,7 +560,11 @@ export default function SettingsPage() {
                 <Select
                   value={settings.currency}
                   label="Currency"
-                  onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+                  onChange={(e) => {
+                    const newCurrency = e.target.value;
+                    const newSymbol = getCurrencySymbol(newCurrency);
+                    setSettings({ ...settings, currency: newCurrency, currencySymbol: newSymbol });
+                  }}
                 >
                   <MenuItem value="PKR">Pakistani Rupee (Rs)</MenuItem>
                   <MenuItem value="USD">US Dollar ($)</MenuItem>

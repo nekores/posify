@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCurrencySymbol } from '@/lib/currency';
 
 // POS Cart Store
 interface CartItem {
@@ -264,6 +265,7 @@ interface AppSettings {
   toggleDarkMode: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   setSettings: (settings: Partial<AppSettings>) => void;
+  syncCurrencyFromSettings: () => Promise<void>;
 }
 
 export const useAppStore = create<AppSettings>()(
@@ -298,6 +300,19 @@ export const useAppStore = create<AppSettings>()(
         }
       },
       setSettings: (settings) => set((state) => ({ ...state, ...settings })),
+      syncCurrencyFromSettings: async () => {
+        try {
+          const response = await fetch('/api/settings');
+          const data = await response.json();
+          if (data.settings) {
+            const currency = data.settings.currency || 'PKR';
+            const currencySymbol = data.settings.currencySymbol || getCurrencySymbol(currency);
+            set({ currency, currencySymbol });
+          }
+        } catch (error) {
+          console.error('Error syncing currency from settings:', error);
+        }
+      },
     }),
     {
       name: 'app-settings',

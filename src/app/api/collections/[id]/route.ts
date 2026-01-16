@@ -146,7 +146,7 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: `Collection of Rs. ${collectionAmount.toLocaleString()} from ${customerName} deleted successfully.`,
+      message: `Collection of ${collectionAmount.toLocaleString()} from ${customerName} deleted successfully.`,
       deletedCollection: {
         id: params.id,
         amount: collectionAmount,

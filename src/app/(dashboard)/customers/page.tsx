@@ -61,6 +61,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useAppStore } from '@/store/useStore';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -108,6 +109,7 @@ interface Customer {
 }
 
 export default function CustomersPage() {
+  const { currencySymbol } = useAppStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -637,7 +639,7 @@ export default function CustomersPage() {
                   type="number"
                   fullWidth
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                   }}
                 />
               </Grid>
@@ -648,7 +650,7 @@ export default function CustomersPage() {
                   type="number"
                   fullWidth
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                   }}
                 />
               </Grid>

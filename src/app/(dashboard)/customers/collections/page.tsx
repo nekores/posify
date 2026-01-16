@@ -40,6 +40,7 @@ import {
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useAppStore } from '@/store/useStore';
 
 interface Customer {
   id: string;
@@ -63,6 +64,7 @@ interface Collection {
 }
 
 export default function CashCollectionsPage() {
+  const { currencySymbol } = useAppStore();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -424,7 +426,7 @@ export default function CashCollectionsPage() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             InputProps={{
-              startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
             }}
             sx={{ mb: 2 }}
           />

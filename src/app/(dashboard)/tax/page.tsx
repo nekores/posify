@@ -23,6 +23,7 @@ import {
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { useFormatCurrency } from '@/lib/currency';
 
 interface TaxStats {
   thisYear: number;
@@ -40,6 +41,7 @@ interface TaxStats {
 }
 
 export default function TaxManagementPage() {
+  const formatCurrency = useFormatCurrency();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<TaxStats | null>(null);
 
@@ -110,7 +112,7 @@ export default function TaxManagementPage() {
                     Tax This Year
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    Rs. {stats.thisYear.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(stats.thisYear)}
                   </Typography>
                   {yearGrowth !== 0 && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
@@ -158,7 +160,7 @@ export default function TaxManagementPage() {
                     Tax Last Year
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    Rs. {stats.lastYear.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(stats.lastYear)}
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
                     Previous year
@@ -197,7 +199,7 @@ export default function TaxManagementPage() {
                     Tax This Month
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    Rs. {stats.thisMonth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(stats.thisMonth)}
                   </Typography>
                   {monthGrowth !== 0 && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
@@ -245,7 +247,7 @@ export default function TaxManagementPage() {
                     Tax Last Month
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    Rs. {stats.lastMonth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(stats.lastMonth)}
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
                     Previous month
@@ -299,7 +301,7 @@ export default function TaxManagementPage() {
                       </TableCell>
                       <TableCell align="right">
                         <Typography fontWeight="bold" color="primary">
-                          Rs. {item.tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(item.tax)}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
@@ -349,7 +351,7 @@ export default function TaxManagementPage() {
                       </TableCell>
                       <TableCell align="right">
                         <Typography fontWeight="bold" color="primary">
-                          Rs. {item.tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(item.tax)}
                         </Typography>
                       </TableCell>
                     </TableRow>

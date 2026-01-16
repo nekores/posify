@@ -48,6 +48,7 @@ import {
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useAppStore } from '@/store/useStore';
 
 interface Customer {
   id: string;
@@ -125,6 +126,7 @@ interface SaleDetail {
 }
 
 export default function CustomerDetailPage() {
+  const { currencySymbol } = useAppStore();
   const params = useParams();
   const router = useRouter();
   const customerId = params.id as string;
@@ -682,7 +684,7 @@ export default function CustomerDetailPage() {
             value={collectionAmount}
             onChange={(e) => setCollectionAmount(e.target.value)}
             InputProps={{
-              startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
             }}
             sx={{ mb: 2 }}
           />

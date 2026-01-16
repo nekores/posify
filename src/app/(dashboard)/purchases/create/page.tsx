@@ -44,6 +44,7 @@ import {
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useAppStore } from '@/store/useStore';
 
 interface Supplier {
   id: string;
@@ -78,6 +79,7 @@ interface PurchaseItem {
 }
 
 export default function CreatePurchasePage() {
+  const { currencySymbol } = useAppStore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -705,7 +707,7 @@ export default function CreatePurchasePage() {
               onChange={(e) => setCashPaid(Number(e.target.value))}
               disabled={paymentType === 'credit'}
               InputProps={{
-                startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
               }}
             />
           </Grid>

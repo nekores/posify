@@ -24,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useStore';
 
 interface HeaderProps {
@@ -33,6 +34,7 @@ interface HeaderProps {
 export default function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession();
   const { darkMode, toggleDarkMode } = useAppStore();
+  const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -41,6 +43,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleProfile = () => {
+    handleMenuClose();
+    router.push('/profile');
+  };
+
+  const handleSettings = () => {
+    handleMenuClose();
+    router.push('/settings');
   };
 
   const handleLogout = () => {
@@ -115,13 +127,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
             </Typography>
           </Box>
           <Divider />
-          <MenuItem>
+          <MenuItem onClick={handleProfile}>
             <ListItemIcon>
               <PersonIcon fontSize="small" />
             </ListItemIcon>
             Profile
           </MenuItem>
-          <MenuItem>
+          <MenuItem onClick={handleSettings}>
             <ListItemIcon>
               <SettingsIcon fontSize="small" />
             </ListItemIcon>
